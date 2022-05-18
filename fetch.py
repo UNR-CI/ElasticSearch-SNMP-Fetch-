@@ -1,7 +1,12 @@
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan
+import matplotlib.pyplot as plt
 import pandas as pd
-def get_data_from_elastic(host='10.22.2.254',fromDate='now-20d/d',toDate='now/d', index='logs-snmpdevices-default'):
+from dateutil import parser
+from matplotlib.animation import FuncAnimation
+import numpy as np
+
+def get_data_from_elastic(host='10.22.2.254',fromDate='now-7d/d',toDate='now/d', index='logs-snmpdevices-default'):
     '''
         Description: The follow function will grab snmp data from elasticsearch in a specified topic and at a given time range
         Parameters: host - The ip address to filter out of the data
@@ -51,6 +56,25 @@ def get_data_from_elastic(host='10.22.2.254',fromDate='now-20d/d',toDate='now/d'
     df = pd.DataFrame(temp)
     return df
 
+def processData(array,time):
+    newArray = array.copy()
+    for i in range(1,len(array)):
+        current = array.index[i]
+        previous = array.index[i-1]
+
+        value = (array[current] - array[previous]) / ((time[current] - time[previous]).total_seconds() + 1E-9)
+        # set value to zero if times are equivalent
+        if(time[current] == time[previous]):
+            value = 0
+
+        if value < 0:
+            # logic to actually grab the wanted value properly circumnavigating the overflow
+            value = 4294967295 - array[previous] + array[current]
+        elif np.isnan(value):
+            value = 0
+        newArray[previous] = value
+    newArray[array.index[-1]]=0
+    return newArray
 
 server = 'ncar-im-0.rc.unr.edu' # 134.197.75.31
 port = 30549
@@ -63,15 +87,8 @@ print(es.info())
 
 data = get_data_from_elastic()
 
-# iterating over timestamps -- timestamps are in order
-for i in data['@timestamp']:
-    print(i)
 
-# printing out values for output bytes for interface
-for i in data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifOutOctets.3']:
-    print(i)
-
-print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.1'][0])
+'''print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.1'][0])
 print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.2'][0])
 print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.3'][0])
 print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.4'][0])
@@ -81,24 +98,38 @@ print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.7
 print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.8'][0])
 print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.9'][0])
 print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.10'][0])
-print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.12'][0])
+print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.12'][0])'''
+
+
+sort_times = np.vectorize(parser.parse)
+data['@timestamp'] = sort_times(data['@timestamp'])
 
 columns = list(data.columns)
-
-print('Listing all columns out of elasticsearch record:')
-print(columns)
+columns.sort()
 
 interfaceFields = [ column for column in columns if 'ifDescr' in column]
 interfaceNames = [data[name][0] for name in interfaceFields]
-
-print(interfaceFields)
-print(interfaceNames)
+interfaceSpeed = [column for column in columns if 'ifSpeed' in column]
 
 #grabbing all outoctet fields 
 outOctets = [column for column in columns if 'OutOctets' in column]
 inOctets = [column for column in columns if 'InOctets' in column]
 
+data = data.sort_values(by='@timestamp')
 
-print(interfaceNames)
-print(columns)
+values = {}
+for outOctet in outOctets:
+    values[outOctet] = processData(data[outOctet].copy(),data['@timestamp'].copy())
+
+time = data['@timestamp']
+
+for i in range(len(outOctets)):
+    plt.figure(interfaceNames[i])
+    plt.plot(time, values[inOctets[i]])
+    plt.yscale('linear')
+
+plt.tight_layout()
+
+plt.show()
+
 
