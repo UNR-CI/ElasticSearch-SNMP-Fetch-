@@ -6,7 +6,7 @@ from dateutil import parser
 from matplotlib.animation import FuncAnimation
 import numpy as np
 
-def get_data_from_elastic(host='10.22.2.254',fromDate='now-7d/d',toDate='now/d', index='logs-snmpdevices-default'):
+def get_data_from_elastic(host='10.22.2.254',fromDate='now-30d/d',toDate='now/d', index='logs-snmpdevices-default'):
     '''
         Description: The follow function will grab snmp data from elasticsearch in a specified topic and at a given time range
         Parameters: host - The ip address to filter out of the data
@@ -74,7 +74,7 @@ def processData(array,time):
             value = 0
         newArray[previous] = value
     newArray[array.index[-1]]=0
-    return newArray
+    return newArray[newArray.index]
 
 server = 'ncar-im-0.rc.unr.edu' # 134.197.75.31
 port = 30549
@@ -117,19 +117,40 @@ inOctets = [column for column in columns if 'InOctets' in column]
 
 data = data.sort_values(by='@timestamp')
 
+data.to_csv('all.csv')
+
 values = {}
+nan_to_zero = lambda x: 0 if np.isnan(x) else x
+nan_to_zero = np.vectorize(nan_to_zero)
 for outOctet in outOctets:
+    data[outOctet] = nan_to_zero(data[outOctet]) 
     values[outOctet] = processData(data[outOctet].copy(),data['@timestamp'].copy())
 
-time = data['@timestamp']
+for inOctet in inOctets:
+    data[inOctet] = nan_to_zero(data[inOctet])
+    values[inOctet] = processData(data[inOctet].copy(),data['@timestamp'].copy())
 
+
+time = data['@timestamp']
+print(time)
+time.to_csv('time.csv')
 for i in range(len(outOctets)):
-    plt.figure(interfaceNames[i])
+    values[outOctets[i]].to_csv('out'+interfaceNames[i]+'.csv')
+    plt.figure(interfaceNames[i]+'egress')
+    plt.plot(time, values[outOctets[i]])
+    plt.yscale('linear')
+    plt.savefig(interfaceNames[i]+'egress.png')
+    plt.close(interfaceNames[i]+'egress')
+
+for i in range(len(inOctets)):
+    values[inOctets[i]].to_csv('in'+interfaceNames[i]+'.csv')
+    plt.figure(interfaceNames[i]+'ingress')
     plt.plot(time, values[inOctets[i]])
     plt.yscale('linear')
+    plt.savefig(interfaceNames[i]+'ingress.png')
+    plt.close(interfaceNames[i]+'ingress')
 
 plt.tight_layout()
-
-plt.show()
+#plt.show()
 
 
