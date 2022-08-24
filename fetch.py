@@ -136,7 +136,7 @@ print(time)
 time.to_csv('time.csv')
 for i in range(len(outOctets)):
     values[outOctets[i]].to_csv('out'+interfaceNames[i]+'.csv')
-    plt.figure(interfaceNames[i]+'egress')
+    plt.figure(interfaceNames[i]+'egress',figsize=(10,10))
     plt.plot(time, values[outOctets[i]])
     plt.yscale('linear')
     plt.savefig(interfaceNames[i]+'egress.png')
@@ -144,13 +144,13 @@ for i in range(len(outOctets)):
 
 for i in range(len(inOctets)):
     values[inOctets[i]].to_csv('in'+interfaceNames[i]+'.csv')
-    plt.figure(interfaceNames[i]+'ingress')
+    plt.figure(interfaceNames[i]+'ingress',figsize=(10,10))
     plt.plot(time, values[inOctets[i]])
     plt.yscale('linear')
     plt.savefig(interfaceNames[i]+'ingress.png')
     plt.close(interfaceNames[i]+'ingress')
 
-plt.tight_layout()
+#plt.tight_layout()
 #plt.show()
 
 
