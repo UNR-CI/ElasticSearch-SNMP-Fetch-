@@ -69,9 +69,12 @@ def processData(array,time):
 
         if value < 0:
             # logic to actually grab the wanted value properly circumnavigating the overflow
-            value = 4294967295 - array[previous] + array[current]
+            value = 0#4294967295 - array[previous] + array[current]
         elif np.isnan(value):
             value = 0
+
+        if (value > 1E9):
+            print('alert', array[previous], array[current],value)
         newArray[previous] = value
     newArray[array.index[-1]]=0
     return newArray[newArray.index]
@@ -87,6 +90,8 @@ print(es.info())
 
 data = get_data_from_elastic()
 
+
+print(data)
 
 '''print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.1'][0])
 print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.2'][0])
@@ -122,8 +127,18 @@ data.to_csv('all.csv')
 values = {}
 nan_to_zero = lambda x: 0 if np.isnan(x) else x
 nan_to_zero = np.vectorize(nan_to_zero)
+
+indexs = []
+
+data = data.drop(data[np.isnan(data[outOctets[0]])].index)
+#print(data[np.isnan(data[outOctets[0]])].index)
+#print(indexs)
+#print(data1)
+#print('HERE')
 for outOctet in outOctets:
-    data[outOctet] = nan_to_zero(data[outOctet]) 
+
+    #data[outOctet].to_csv(outOctet+'test.csv')
+    #data[outOctet] = nan_to_zero(data[outOctet]) 
     values[outOctet] = processData(data[outOctet].copy(),data['@timestamp'].copy())
 
 for inOctet in inOctets:
