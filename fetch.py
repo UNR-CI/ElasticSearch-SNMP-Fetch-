@@ -6,7 +6,7 @@ from dateutil import parser
 from matplotlib.animation import FuncAnimation
 import numpy as np
 
-def get_data_from_elastic(host='10.22.2.254',fromDate='now-30d/d',toDate='now/d', index='logs-snmpdevices-default'):
+def get_data_from_elastic(host='172.20.133.133',fromDate='now-10d/d',toDate='now', index='logs-snmpdevices-default'):
     '''
         Description: The follow function will grab snmp data from elasticsearch in a specified topic and at a given time range
         Parameters: host - The ip address to filter out of the data
@@ -79,8 +79,8 @@ def processData(array,time):
     newArray[array.index[-1]]=0
     return newArray[newArray.index]
 
-server = 'ncar-im-0.rc.unr.edu' # 134.197.75.31
-port = 30549
+server = 'localhost' # 134.197.75.31
+port = 9200
 connectionScheme = 'http'
 
 es = Elasticsearch(hosts = [{'host':server,'port':port,"scheme":connectionScheme}], verify_certs = 'False')
@@ -109,18 +109,23 @@ print(data['iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable.ifEntry.ifDescr.1
 sort_times = np.vectorize(parser.parse)
 data['@timestamp'] = sort_times(data['@timestamp'])
 
+
 columns = list(data.columns)
 columns.sort()
-
-interfaceFields = [ column for column in columns if 'ifDescr' in column]
-interfaceNames = [data[name][0] for name in interfaceFields]
-interfaceSpeed = [column for column in columns if 'ifSpeed' in column]
 
 #grabbing all outoctet fields 
 outOctets = [column for column in columns if 'OutOctets' in column]
 inOctets = [column for column in columns if 'InOctets' in column]
 
+data = data.drop(data[np.isnan(data[outOctets[0]])].index)
 data = data.sort_values(by='@timestamp')
+
+
+interfaceFields = [ column for column in columns if 'ifDescr' in column]
+interfaceNames = [data[name][data.index[0]] for name in interfaceFields]
+interfaceSpeed = [column for column in columns if 'ifSpeed' in column]
+
+
 
 data.to_csv('all.csv')
 
@@ -130,7 +135,7 @@ nan_to_zero = np.vectorize(nan_to_zero)
 
 indexs = []
 
-data = data.drop(data[np.isnan(data[outOctets[0]])].index)
+
 #print(data[np.isnan(data[outOctets[0]])].index)
 #print(indexs)
 #print(data1)
@@ -150,6 +155,10 @@ time = data['@timestamp']
 print(time)
 time.to_csv('time.csv')
 for i in range(len(outOctets)):
+    print(values[outOctets[i]])
+    print(outOctets[i])
+    print(interfaceNames[i])
+    print(interfaceNames)
     values[outOctets[i]].to_csv('out'+interfaceNames[i]+'.csv')
     plt.figure(interfaceNames[i]+'egress',figsize=(10,10))
     plt.plot(time, values[outOctets[i]])
