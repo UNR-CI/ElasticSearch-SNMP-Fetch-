@@ -79,8 +79,8 @@ def processData(array,time):
     newArray[array.index[-1]]=0
     return newArray[newArray.index]
 
-server = 'localhost' # 134.197.75.31
-port = 9200
+server = 'ncar-im-0.rc.unr.edu' # 134.197.75.31
+port = 30549
 connectionScheme = 'http'
 
 es = Elasticsearch(hosts = [{'host':server,'port':port,"scheme":connectionScheme}], verify_certs = 'False')
