@@ -68,23 +68,31 @@ def processData(array,time):
         current = array.index[i]
         previous = array.index[i-1]
 
-        value = (array[current] - array[previous]) / 30.0 #((time[current] - time[previous]).total_seconds() + 1E-9)
+        value = (array[current] - array[previous]) / ((time[current] - time[previous]).total_seconds() + 1E-9)
         # set value to zero if times are equivalent
         if(time[current] == time[previous]):
-            value = 0
+            pass
+            #print(time[current],time[previous],current,previous)
+            print(array[current],array[previous])
+            #print('zero')
+        #    value = 0
 
         if value < 0:
             # logic to actually grab the wanted value properly circumnavigating the overflow
-            value = 0#4294967295 - array[previous] + array[current]
+            pass
+            #print('negative')
+        #    value = 0#4294967295 - array[previous] + array[current]
         elif np.isnan(value):
-            value = 0
+            pass
+            #print('nan')
+        #    value = 0
 
         if (value > 1E9):
             print('alert', array[previous], array[current],value)
         newArray[previous] = value
     newArray[array.index[-1]]=0
-    print(newArray[newArray.index].shape)
-    print(time[newArray.index].shape)
+    #print(newArray[newArray.index].shape)
+    #print(time[newArray.index].shape)
     return pd.concat([newArray[newArray.index], time[newArray.index]],axis = 1)
 
 
@@ -98,11 +106,11 @@ if __name__ == "__main__":
                         prog='Plot From Elastic Search',
                         description='The following program will plot any values specified to this program.',
                         epilog='Text at the bottom of help')
-    fields = ['capacityrx','capacitytx']
+    fields = ['capacityrx','capacitytx','throughputrx','throughputx']
     parser.add_argument('-fields', default=fields, action=SplitArgs)
     parser.add_argument('-index',default='logs-nonaftluairfiber-default')
     parser.add_argument('-pastdelta',default='10m')
-
+    parser.add_argument('-together',default=False)
     arguments = parser.parse_args()
     fields = arguments.fields
 
@@ -125,28 +133,50 @@ if __name__ == "__main__":
         fields.remove('host')
 
     data = get_data_from_elastic(index=arguments.index,fromDate='now-'+arguments.pastdelta)
+    
     data['timestamp'] = pd.to_datetime(data['@timestamp'])
+    data = data.drop_duplicates(subset=['timestamp'])
     #sort_times = np.vectorize(timeparser.parse)
     #data['@timestamp'] = sort_times(data['@timestamp'])
     data = data.sort_values(by='timestamp')
+    #data = data.fillna(0)
     #data = data.sort_index()
-    print(data)
+    #print(data)
     for field in fields:
         print('start' + field)
         #ax = plt.figure(arguments.index + '_' + field ,figsize=(5,5))
         # make plots set timestamps to year-month-day and make ticks have less things 
         # vega does not work as intended 
-        fig, ax = plt.subplots(figsize=(5,5))
-        print(mapping)
-        ax.set_title(mapping['host'] + ' ' + mapping[field])
-        ax.plot(data['timestamp'], data[field])
+        if arguments.together == False:
+            fig, ax = plt.subplots(figsize=(5,5))
+            ax.set_title(mapping['host'] + ' ' + mapping[field]["displayname"])
+
+        if mapping[field]["type"] == "throughput":
+            print('ttt',field)
+            if arguments.together == False:
+                ax.plot(data['timestamp'], processData(pd.to_numeric(data[field]),  data['timestamp']) )
+            else:
+                plt.plot(data['timestamp'], processData(pd.to_numeric(data[field]),  data['timestamp']), label=mapping[field]['displayname'] )
+        else:
+            #pass
+            #print('sss',field)
+            if arguments.together == False:
+                ax.plot(data['timestamp'], pd.to_numeric(data[field])*mapping[field]['divisor'])
+            else:
+                plt.plot(data['timestamp'], pd.to_numeric(data[field])*mapping[field]['divisor'], label=mapping[field]['displayname'])
         #print(data['timestamp'].dtype)
-        cdf = matplotlib.dates.ConciseDateFormatter(ax.xaxis.get_major_locator())
-        ax.xaxis.set_major_formatter(cdf)
-        #print(ax.get_axes())
-        #print(data['@timestamp'])
-        #print(data[field])
-        fig.savefig(field+'.png')
+        
+        if arguments.together == False:
+            cdf = matplotlib.dates.ConciseDateFormatter(ax.xaxis.get_major_locator())
+            ax.xaxis.set_major_formatter(cdf)
+            fig.savefig(field+'.png')
+        else:
+            plt.legend()
+            ax = plt.gca()
+            cdf = matplotlib.dates.ConciseDateFormatter( ax.xaxis.get_major_locator())
+            ax.xaxis.set_major_formatter(cdf)
+            ax.set_title(mapping['host'])
+            
         print('done' + field)
         #plt.show()
     plt.tight_layout()
